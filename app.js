@@ -15,18 +15,17 @@
     ambient: {
       speed: 1,
       particleScale: 1,
-      particleOpacity: 0.62,
-      meshOpacity: 0.14,
-      nebulaStrength: 0.76,
+      particleOpacity: 0.64,
+      nebulaStrength: 0.72,
       palette: {
-        background: "#070c14",
+        background: "#04050f",
         nebula: [
-          "rgba(68, 99, 136, 0.22)",
-          "rgba(45, 72, 108, 0.20)",
-          "rgba(34, 50, 76, 0.16)"
+          "rgba(113, 95, 165, 0.22)",
+          "rgba(59, 77, 146, 0.20)",
+          "rgba(30, 41, 89, 0.2)",
+          "rgba(93, 74, 143, 0.16)"
         ],
-        mesh: "rgba(170, 196, 226, 1)",
-        particle: "rgba(197, 219, 246, 1)",
+        particle: "rgba(229, 238, 252, 1)",
         ripple: "rgba(206, 225, 248, 1)"
       }
     },
@@ -34,17 +33,16 @@
       speed: 0.72,
       particleScale: 0.82,
       particleOpacity: 0.52,
-      meshOpacity: 0.1,
-      nebulaStrength: 0.66,
+      nebulaStrength: 0.58,
       palette: {
-        background: "#060a11",
+        background: "#03040b",
         nebula: [
-          "rgba(61, 84, 116, 0.18)",
-          "rgba(37, 55, 82, 0.17)",
-          "rgba(28, 41, 64, 0.14)"
+          "rgba(90, 81, 142, 0.18)",
+          "rgba(49, 66, 126, 0.16)",
+          "rgba(24, 35, 76, 0.16)",
+          "rgba(73, 61, 118, 0.14)"
         ],
-        mesh: "rgba(145, 170, 202, 1)",
-        particle: "rgba(181, 206, 236, 1)",
+        particle: "rgba(210, 224, 243, 1)",
         ripple: "rgba(189, 213, 243, 1)"
       }
     },
@@ -52,17 +50,16 @@
       speed: 0.55,
       particleScale: 0.68,
       particleOpacity: 0.46,
-      meshOpacity: 0.08,
-      nebulaStrength: 0.58,
+      nebulaStrength: 0.48,
       palette: {
-        background: "#04070d",
+        background: "#020308",
         nebula: [
-          "rgba(47, 66, 96, 0.15)",
-          "rgba(29, 43, 66, 0.14)",
-          "rgba(23, 34, 52, 0.12)"
+          "rgba(76, 66, 124, 0.14)",
+          "rgba(39, 53, 103, 0.13)",
+          "rgba(18, 26, 58, 0.14)",
+          "rgba(64, 52, 103, 0.11)"
         ],
-        mesh: "rgba(121, 143, 169, 1)",
-        particle: "rgba(165, 189, 218, 1)",
+        particle: "rgba(192, 208, 230, 1)",
         ripple: "rgba(173, 197, 224, 1)"
       }
     }
@@ -376,7 +373,7 @@
       this.motionQuery = null;
       this.motionListener = null;
 
-      this.blobs = [];
+      this.nebulaFields = [];
       this.particles = [];
       this.ripples = [];
       this.shootingStars = [];
@@ -387,7 +384,7 @@
 
       this.bindMotionPreference();
       this.resize();
-      this.rebuildBlobs();
+      this.rebuildNebulaFields();
       this.syncParticleCount(true);
       this.scheduleNextShootingStar(performance.now());
       this.render();
@@ -409,7 +406,7 @@
       this.reducedMotion = Boolean(value);
       this.shootingStars.length = 0;
       this.scheduleNextShootingStar(performance.now());
-      this.rebuildBlobs();
+      this.rebuildNebulaFields();
       this.syncParticleCount(false);
       this.render();
     }
@@ -428,7 +425,7 @@
         particle.baseVy = drift.vy;
       }
 
-      this.rebuildBlobs();
+      this.rebuildNebulaFields();
       this.syncParticleCount(false);
       this.render();
     }
@@ -441,7 +438,7 @@
     }
 
     setStarSpeed(value) {
-      this.starSpeed = clamp(Number(value) || 1, 0.4, 2.4);
+      this.starSpeed = clamp(Number(value) || 1, 0.4, 5);
       this.render();
     }
 
@@ -479,14 +476,14 @@
 
     calculateParticleTarget() {
       const normalized = (this.intensity - 0.2) / 0.8;
-      const baseCount = Math.round(120 + normalized * 140);
+      const baseCount = Math.round(180 + normalized * 210);
       const scaledCount = Math.round(baseCount * this.profile.particleScale);
 
       if (this.reducedMotion) {
-        return Math.max(50, Math.round(scaledCount * 0.5));
+        return Math.max(80, Math.round(scaledCount * 0.45));
       }
 
-      return clamp(scaledCount, 120, 260);
+      return clamp(scaledCount, 180, 390);
     }
 
     syncParticleCount(forceRebuild = false) {
@@ -550,23 +547,23 @@
         }
       }
 
-      this.rebuildBlobs();
+      this.rebuildNebulaFields();
       this.render();
     }
 
-    rebuildBlobs() {
-      const blobCount = this.reducedMotion ? 3 : 5;
-      const baseRadius = Math.min(this.width, this.height) * 0.3;
+    rebuildNebulaFields() {
+      const fieldCount = this.reducedMotion ? 3 : 5;
+      const baseRadius = Math.min(this.width, this.height) * 0.34;
 
-      this.blobs = Array.from({ length: blobCount }, (_, index) => ({
-        baseX: 0.12 + Math.random() * 0.76,
-        baseY: 0.12 + Math.random() * 0.76,
-        radius: baseRadius * (0.7 + Math.random() * 0.65),
-        driftX: this.width * (0.01 + Math.random() * 0.05),
-        driftY: this.height * (0.01 + Math.random() * 0.05),
-        speed: 0.03 + Math.random() * 0.06,
+      this.nebulaFields = Array.from({ length: fieldCount }, (_, index) => ({
+        baseX: 0.1 + Math.random() * 0.8,
+        baseY: 0.1 + Math.random() * 0.8,
+        radius: baseRadius * (0.72 + Math.random() * 0.66),
+        driftX: this.width * (0.008 + Math.random() * 0.024),
+        driftY: this.height * (0.008 + Math.random() * 0.024),
+        speed: 0.016 + Math.random() * 0.03,
         phase: Math.random() * Math.PI * 2,
-        parallax: 12 + Math.random() * 20,
+        parallax: 8 + Math.random() * 16,
         colorIndex: index % this.profile.palette.nebula.length
       }));
     }
@@ -626,8 +623,8 @@
         particle.vy = drift.vy;
       }
 
-      for (const blob of this.blobs) {
-        blob.phase = Math.random() * Math.PI * 2;
+      for (const field of this.nebulaFields) {
+        field.phase = Math.random() * Math.PI * 2;
       }
 
       this.render();
@@ -642,7 +639,7 @@
       this.pointer.targetY = clamp(clientY / this.height, 0, 1);
     }
 
-    clickAt(clientX, clientY) {
+    clickAt(clientX, clientY, { emitTap = true } = {}) {
       const x = clamp(clientX, 0, this.width);
       const y = clamp(clientY, 0, this.height);
 
@@ -671,7 +668,7 @@
         }
       }
 
-      if (typeof this.onTap === "function") {
+      if (emitTap && typeof this.onTap === "function") {
         this.onTap();
       }
 
@@ -733,90 +730,41 @@
       this.ctx.fillRect(0, 0, this.width, this.height);
 
       this.drawNebula();
-      this.drawMesh();
       this.drawParticles();
       this.drawShootingStars();
       this.drawRipples();
     }
 
     drawNebula() {
+      if (!this.nebulaFields.length) {
+        return;
+      }
+
       const palette = this.profile.palette;
-      const driftStrength = this.reducedMotion ? 0.18 : 1;
+      const driftStrength = this.reducedMotion ? 0.22 : 1;
 
       this.ctx.save();
-      this.ctx.globalCompositeOperation = "lighter";
+      this.ctx.globalCompositeOperation = "screen";
       this.ctx.globalAlpha = this.profile.nebulaStrength;
 
-      for (const blob of this.blobs) {
+      for (const field of this.nebulaFields) {
         const x =
-          blob.baseX * this.width +
-          Math.sin(this.time * blob.speed + blob.phase) * blob.driftX * driftStrength +
-          (this.pointer.x - 0.5) * blob.parallax;
+          field.baseX * this.width +
+          Math.sin(this.time * field.speed + field.phase) * field.driftX * driftStrength +
+          (this.pointer.x - 0.5) * field.parallax;
 
         const y =
-          blob.baseY * this.height +
-          Math.cos(this.time * blob.speed * 1.1 + blob.phase) * blob.driftY * driftStrength +
-          (this.pointer.y - 0.5) * blob.parallax;
+          field.baseY * this.height +
+          Math.cos(this.time * field.speed * 1.1 + field.phase) * field.driftY * driftStrength +
+          (this.pointer.y - 0.5) * field.parallax;
 
-        const radius = blob.radius * (0.92 + Math.sin(this.time * blob.speed * 0.7 + blob.phase) * 0.08 * driftStrength);
-
+        const radius = field.radius * (0.9 + Math.sin(this.time * field.speed * 0.8 + field.phase) * 0.07);
         const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radius);
-        gradient.addColorStop(0, palette.nebula[blob.colorIndex % palette.nebula.length]);
+        gradient.addColorStop(0, palette.nebula[field.colorIndex % palette.nebula.length]);
         gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
 
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-      }
-
-      this.ctx.restore();
-    }
-
-    drawMesh() {
-      const waveAmp = (3 + this.intensity * 6) * (this.reducedMotion ? 0.25 : 1);
-      const horizontalRows = 6;
-      const verticalCols = 7;
-      const xStep = Math.max(56, this.width / 14);
-      const yStep = Math.max(58, this.height / 12);
-
-      this.ctx.save();
-      this.ctx.strokeStyle = this.profile.palette.mesh;
-      this.ctx.lineWidth = 1;
-      this.ctx.globalAlpha = this.profile.meshOpacity;
-
-      for (let row = 1; row < horizontalRows; row += 1) {
-        const baseY = (row / horizontalRows) * this.height;
-        this.ctx.beginPath();
-
-        for (let x = -xStep; x <= this.width + xStep; x += xStep) {
-          const wave = Math.sin(x * 0.006 + this.time * 0.5 * this.profile.speed + row) * waveAmp;
-          const y = baseY + wave;
-          if (x === -xStep) {
-            this.ctx.moveTo(x, y);
-          } else {
-            this.ctx.lineTo(x, y);
-          }
-        }
-
-        this.ctx.stroke();
-      }
-
-      this.ctx.globalAlpha = this.profile.meshOpacity * 0.55;
-
-      for (let col = 1; col < verticalCols; col += 1) {
-        const baseX = (col / verticalCols) * this.width;
-        this.ctx.beginPath();
-
-        for (let y = -yStep; y <= this.height + yStep; y += yStep) {
-          const wave = Math.sin(y * 0.005 + this.time * 0.45 * this.profile.speed + col * 1.3) * waveAmp * 0.9;
-          const x = baseX + wave;
-          if (y === -yStep) {
-            this.ctx.moveTo(x, y);
-          } else {
-            this.ctx.lineTo(x, y);
-          }
-        }
-
-        this.ctx.stroke();
       }
 
       this.ctx.restore();
@@ -933,6 +881,8 @@
       this.groupToggles = Array.from(document.querySelectorAll(".group-toggle"));
       this.resizeHandler = debounce(() => this.engine.resize(), 180);
       this.goals = [];
+      this.pointerHoldInterval = 0;
+      this.pointerHoldPosition = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5 };
 
       this.timer = new PomodoroTimer({
         onTick: (remaining, phase, running) => this.renderTimer(remaining, phase, running),
@@ -1075,7 +1025,11 @@
       this.engine.canvas.addEventListener(
         "pointerdown",
         (event) => {
-          this.engine.clickAt(event.clientX, event.clientY);
+          if (event.button !== 0) {
+            return;
+          }
+
+          this.startPointerHold(event.clientX, event.clientY);
         },
         { passive: true }
       );
@@ -1083,15 +1037,26 @@
       window.addEventListener(
         "pointermove",
         (event) => {
+          this.updatePointerHoldPosition(event.clientX, event.clientY);
           this.engine.onPointerMove(event.clientX, event.clientY);
         },
         { passive: true }
       );
 
+      window.addEventListener("pointerup", () => {
+        this.stopPointerHold();
+      });
+
+      window.addEventListener("pointercancel", () => {
+        this.stopPointerHold();
+      });
+
       window.addEventListener("pointerleave", () => {
+        this.stopPointerHold();
         this.engine.onPointerMove(this.engine.width * 0.5, this.engine.height * 0.5);
       });
 
+      window.addEventListener("blur", () => this.stopPointerHold());
       window.addEventListener("resize", this.resizeHandler, { passive: true });
       window.addEventListener("keydown", (event) => this.handleShortcuts(event));
     }
@@ -1137,6 +1102,32 @@
     togglePause() {
       const nextPaused = !this.engine.paused;
       this.engine.setPaused(nextPaused);
+    }
+
+    startPointerHold(clientX, clientY) {
+      this.stopPointerHold();
+      this.updatePointerHoldPosition(clientX, clientY);
+      this.engine.onPointerMove(clientX, clientY);
+      this.engine.clickAt(clientX, clientY, { emitTap: true });
+
+      const interval = this.engine.reducedMotion ? 250 : 130;
+      this.pointerHoldInterval = window.setInterval(() => {
+        this.engine.clickAt(this.pointerHoldPosition.x, this.pointerHoldPosition.y, { emitTap: false });
+      }, interval);
+    }
+
+    updatePointerHoldPosition(clientX, clientY) {
+      this.pointerHoldPosition.x = clientX;
+      this.pointerHoldPosition.y = clientY;
+    }
+
+    stopPointerHold() {
+      if (!this.pointerHoldInterval) {
+        return;
+      }
+
+      window.clearInterval(this.pointerHoldInterval);
+      this.pointerHoldInterval = 0;
     }
 
     toggleGroup(toggleButton) {
@@ -1194,7 +1185,7 @@
     }
 
     setStarSpeed(value, persist) {
-      const normalized = clamp(Number(value) || 1, 0.4, 2.4);
+      const normalized = clamp(Number(value) || 1, 0.4, 5);
       this.elements.starSpeedInput.value = normalized.toFixed(1);
       this.elements.starSpeedValue.textContent = `${normalized.toFixed(1)}x`;
 
@@ -1356,11 +1347,15 @@
     renderTimer(remaining, phase, running) {
       const formattedTime = this.formatTime(remaining);
       const phaseLabel = phase === "work" ? "Çalışma" : "Ara";
+      const isBreak = phase === "break";
 
       this.elements.timerDisplay.textContent = formattedTime;
       this.elements.timerPhase.textContent = phaseLabel;
       this.elements.centerTimerDisplay.textContent = formattedTime;
       this.elements.centerTimerPhase.textContent = phaseLabel;
+      this.elements.timerPhase.classList.toggle("is-break", isBreak);
+      this.elements.centerTimerPhase.classList.toggle("is-break", isBreak);
+      this.elements.centerTimerDisplay.classList.toggle("is-break", isBreak);
 
       this.elements.timerStart.disabled = running;
       this.elements.timerStop.disabled = !running;
