@@ -3,6 +3,7 @@
 
   const STORAGE_KEYS = {
     mode: "pufi_focus_mode",
+    environment: "pufi_focus_environment",
     intensity: "pufi_focus_intensity",
     starSpeed: "pufi_focus_star_speed",
     soundEnabled: "pufi_focus_sound_enabled",
@@ -25,6 +26,12 @@
           "rgba(30, 41, 89, 0.2)",
           "rgba(93, 74, 143, 0.16)"
         ],
+        flowBackground: {
+          start: "#0a1424",
+          end: "#050912",
+          haze: "rgba(108, 132, 191, 0.22)",
+          obstacle: "rgba(178, 200, 236, 0.34)"
+        },
         particle: "rgba(229, 238, 252, 1)",
         ripple: "rgba(206, 225, 248, 1)"
       }
@@ -42,6 +49,12 @@
           "rgba(24, 35, 76, 0.16)",
           "rgba(73, 61, 118, 0.14)"
         ],
+        flowBackground: {
+          start: "#09111e",
+          end: "#04070f",
+          haze: "rgba(98, 120, 173, 0.18)",
+          obstacle: "rgba(164, 187, 221, 0.3)"
+        },
         particle: "rgba(210, 224, 243, 1)",
         ripple: "rgba(189, 213, 243, 1)"
       }
@@ -59,6 +72,12 @@
           "rgba(18, 26, 58, 0.14)",
           "rgba(64, 52, 103, 0.11)"
         ],
+        flowBackground: {
+          start: "#070d17",
+          end: "#03050b",
+          haze: "rgba(84, 104, 153, 0.16)",
+          obstacle: "rgba(148, 172, 205, 0.26)"
+        },
         particle: "rgba(192, 208, 230, 1)",
         ripple: "rgba(173, 197, 224, 1)"
       }
@@ -349,6 +368,7 @@
       this.ctx = canvas.getContext("2d", { alpha: false });
 
       this.mode = "ambient";
+      this.environment = "space";
       this.profile = MODE_PROFILES.ambient;
       this.intensity = 0.65;
       this.starSpeed = 1;
@@ -375,9 +395,12 @@
 
       this.nebulaFields = [];
       this.particles = [];
+      this.flowParticles = [];
       this.ripples = [];
       this.shootingStars = [];
       this.nextShootingAt = 0;
+      this.flowBodyLeadX = this.width * 0.58;
+      this.flowBodyCy = this.height * 0.5;
 
       this.onTap = null;
       this.loop = this.loop.bind(this);
@@ -408,6 +431,7 @@
       this.scheduleNextShootingStar(performance.now());
       this.rebuildNebulaFields();
       this.syncParticleCount(false);
+      this.syncFlowParticleCount(false);
       this.render();
     }
 
@@ -427,18 +451,49 @@
 
       this.rebuildNebulaFields();
       this.syncParticleCount(false);
+      this.syncFlowParticleCount(false);
       this.render();
+    }
+
+    setEnvironment(environment) {
+      const nextEnvironment = environment === "flow" ? "flow" : "space";
+      if (this.environment === nextEnvironment) {
+        return;
+      }
+
+      this.environment = nextEnvironment;
+      this.ripples.length = 0;
+
+      if (this.environment === "flow") {
+        this.shootingStars.length = 0;
+        this.syncFlowParticleCount(true);
+      } else {
+        this.syncParticleCount(false);
+      }
+
+      this.render();
+    }
+
+    setFlowBodyAnchor(leadX, centerY) {
+      if (Number.isFinite(leadX)) {
+        this.flowBodyLeadX = clamp(leadX, 0, this.width);
+      }
+
+      if (Number.isFinite(centerY)) {
+        this.flowBodyCy = clamp(centerY, 0, this.height);
+      }
     }
 
     setIntensity(value) {
       const next = clamp(Number(value) || 0.65, 0.2, 1);
       this.intensity = next;
       this.syncParticleCount(false);
+      this.syncFlowParticleCount(false);
       this.render();
     }
 
     setStarSpeed(value) {
-      this.starSpeed = clamp(Number(value) || 1, 0.4, 5);
+      this.starSpeed = clamp(Number(value) || 1, 0.4, 20);
       this.render();
     }
 
@@ -478,12 +533,14 @@
       const normalized = (this.intensity - 0.2) / 0.8;
       const baseCount = Math.round(180 + normalized * 210);
       const scaledCount = Math.round(baseCount * this.profile.particleScale);
+      const densityBoost = 1 + normalized * 9;
+      const boostedCount = Math.round(scaledCount * densityBoost);
 
       if (this.reducedMotion) {
-        return Math.max(80, Math.round(scaledCount * 0.45));
+        return Math.max(80, Math.round(boostedCount * 0.45));
       }
 
-      return clamp(scaledCount, 180, 390);
+      return clamp(boostedCount, 180, 3900);
     }
 
     syncParticleCount(forceRebuild = false) {
@@ -499,6 +556,36 @@
         }
       } else if (this.particles.length > target) {
         this.particles.length = target;
+      }
+    }
+
+    calculateFlowTarget() {
+      const effectiveIntensity = Math.min(this.intensity, 0.75);
+      const normalized = (effectiveIntensity - 0.2) / 0.8;
+      const baseCount = Math.round(70 + normalized * 180);
+      const densityBoost = 1 + normalized * 9;
+      const scaledCount = Math.round(baseCount * this.profile.particleScale * densityBoost);
+
+      if (this.reducedMotion) {
+        return Math.max(36, Math.round(scaledCount * 0.55));
+      }
+
+      return clamp(scaledCount, 70, 2500);
+    }
+
+    syncFlowParticleCount(forceRebuild = false) {
+      const target = this.calculateFlowTarget();
+
+      if (forceRebuild) {
+        this.flowParticles = [];
+      }
+
+      if (this.flowParticles.length < target) {
+        while (this.flowParticles.length < target) {
+          this.flowParticles.push(this.spawnFlowParticle());
+        }
+      } else if (this.flowParticles.length > target) {
+        this.flowParticles.length = target;
       }
     }
 
@@ -527,6 +614,122 @@
       };
     }
 
+    getFlowBaseSpeed() {
+      const motionFactor = this.reducedMotion ? 0.46 : 1;
+      const speedFromSlider = 0.95 + this.starSpeed * 0.24;
+      const intensityFactor = 0.85 + this.intensity * 0.9;
+      return speedFromSlider * intensityFactor * this.profile.speed * motionFactor;
+    }
+
+    getFlowBodyShape() {
+      const chord = clamp(Math.min(this.width, this.height) * 0.155, 92, 158);
+      const thickness = chord * 0.36;
+      const halfChord = chord * 0.5;
+      const halfThickness = thickness * 0.5;
+      const leadX = clamp(this.flowBodyLeadX, halfChord + 24, this.width - 24);
+      const cy = clamp(this.flowBodyCy, halfThickness + 24, this.height - halfThickness - 24);
+      return {
+        cx: leadX - halfChord,
+        cy,
+        leadX,
+        chord,
+        thickness,
+        halfChord,
+        halfThickness
+      };
+    }
+
+    getFlowBodyScaleAtX(xNorm) {
+      if (xNorm >= 0) {
+        return 1;
+      }
+
+      return clamp(1 + xNorm * 0.92, 0.12, 1);
+    }
+
+    getFlowBodyMetric(x, y, body) {
+      const xNorm = (x - body.cx) / body.halfChord;
+      const scaleY = this.getFlowBodyScaleAtX(xNorm);
+      const denomY = body.halfThickness * scaleY;
+      if (denomY < 0.001) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      const yNorm = (y - body.cy) / denomY;
+      return xNorm * xNorm + yNorm * yNorm;
+    }
+
+    getFlowBodyNormal(x, y, body) {
+      const xNorm = (x - body.cx) / body.halfChord;
+      const scaleY = this.getFlowBodyScaleAtX(xNorm);
+      const denomY = Math.max(0.001, body.halfThickness * scaleY);
+      const yNorm = (y - body.cy) / denomY;
+
+      const nxRaw = xNorm / body.halfChord;
+      const nyRaw = yNorm / denomY;
+      const norm = Math.hypot(nxRaw, nyRaw) || 1;
+      return {
+        x: nxRaw / norm,
+        y: nyRaw / norm
+      };
+    }
+
+    drawFlowBodyPath(shape) {
+      const trailingX = shape.cx - shape.halfChord;
+      const leadingX = shape.cx + shape.halfChord;
+      const halfThickness = shape.halfThickness;
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(trailingX, shape.cy);
+      this.ctx.bezierCurveTo(
+        shape.cx - shape.chord * 0.22,
+        shape.cy - halfThickness * 0.55,
+        shape.cx + shape.chord * 0.34,
+        shape.cy - halfThickness * 0.76,
+        leadingX,
+        shape.cy
+      );
+      this.ctx.bezierCurveTo(
+        shape.cx + shape.chord * 0.34,
+        shape.cy + halfThickness * 0.76,
+        shape.cx - shape.chord * 0.22,
+        shape.cy + halfThickness * 0.55,
+        trailingX,
+        shape.cy
+      );
+      this.ctx.closePath();
+    }
+
+    spawnFlowParticle() {
+      const baseSpeed = this.getFlowBaseSpeed();
+      const y = Math.random() * this.height;
+
+      return {
+        x: Math.random() * (this.width + 180),
+        y,
+        baseY: y,
+        vx: -baseSpeed * (0.84 + Math.random() * 0.44),
+        vy: (Math.random() - 0.5) * 0.28,
+        speedBias: 0.84 + Math.random() * 0.42,
+        seed: Math.random() * Math.PI * 2,
+        trail: []
+      };
+    }
+
+    recycleFlowParticle(particle) {
+      const baseSpeed = this.getFlowBaseSpeed();
+      const y = Math.random() * this.height;
+
+      particle.x = this.width + Math.random() * 180;
+      particle.y = y;
+      particle.baseY = y;
+      particle.vx = -baseSpeed * (0.82 + Math.random() * 0.5);
+      particle.vy = (Math.random() - 0.5) * 0.3;
+      particle.speedBias = 0.84 + Math.random() * 0.42;
+      particle.seed = Math.random() * Math.PI * 2;
+      particle.trail.length = 0;
+    }
+
     resize() {
       this.width = window.innerWidth;
       this.height = window.innerHeight;
@@ -544,6 +747,15 @@
         for (const particle of this.particles) {
           particle.x = clamp(particle.x, 0, this.width);
           particle.y = clamp(particle.y, 0, this.height);
+        }
+      }
+
+      if (!this.flowParticles.length) {
+        this.syncFlowParticleCount(true);
+      } else {
+        for (const flowParticle of this.flowParticles) {
+          flowParticle.x = clamp(flowParticle.x, -160, this.width + 180);
+          flowParticle.y = clamp(flowParticle.y, -90, this.height + 90);
         }
       }
 
@@ -627,6 +839,10 @@
         field.phase = Math.random() * Math.PI * 2;
       }
 
+      for (const flowParticle of this.flowParticles) {
+        this.recycleFlowParticle(flowParticle);
+      }
+
       this.render();
     }
 
@@ -656,15 +872,32 @@
       const radius = (105 + this.intensity * 150) * (this.reducedMotion ? 0.55 : 1);
       const pushBase = (0.4 + this.intensity * 0.72) * (this.reducedMotion ? 0.55 : 1);
 
-      for (const particle of this.particles) {
-        const dx = particle.x - x;
-        const dy = particle.y - y;
-        const distance = Math.hypot(dx, dy);
+      if (this.environment === "flow") {
+        const flowRadius = radius * 1.9;
+        const flowPushBase = pushBase * 3.2;
 
-        if (distance > 0 && distance < radius) {
-          const power = (1 - distance / radius) * pushBase;
-          particle.vx += (dx / distance) * power * 0.28;
-          particle.vy += (dy / distance) * power * 0.28;
+        for (const flowParticle of this.flowParticles) {
+          const dx = flowParticle.x - x;
+          const dy = flowParticle.y - y;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance > 0 && distance < flowRadius) {
+            const power = (1 - distance / flowRadius) * flowPushBase;
+            flowParticle.vx += (dx / distance) * power * 1.9;
+            flowParticle.vy += (dy / distance) * power * 3.1;
+          }
+        }
+      } else {
+        for (const particle of this.particles) {
+          const dx = particle.x - x;
+          const dy = particle.y - y;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance > 0 && distance < radius) {
+            const power = (1 - distance / radius) * pushBase;
+            particle.vx += (dx / distance) * power * 0.28;
+            particle.vy += (dy / distance) * power * 0.28;
+          }
         }
       }
 
@@ -689,39 +922,43 @@
       const parallaxStrength = this.reducedMotion ? 0.008 : 0.03;
       const wrapMargin = 24;
 
-      for (const particle of this.particles) {
-        particle.vx += (particle.baseVx - particle.vx) * 0.02;
-        particle.vy += (particle.baseVy - particle.vy) * 0.02;
-
-        const px = (this.pointer.x - 0.5) * particle.depth * parallaxStrength;
-        const py = (this.pointer.y - 0.5) * particle.depth * parallaxStrength;
-
-        particle.x += (particle.vx + px) * dt * 60 * speedFactor;
-        particle.y += (particle.vy + py) * dt * 60 * speedFactor;
-
-        if (particle.x < -wrapMargin) particle.x = this.width + wrapMargin;
-        if (particle.x > this.width + wrapMargin) particle.x = -wrapMargin;
-        if (particle.y < -wrapMargin) particle.y = this.height + wrapMargin;
-        if (particle.y > this.height + wrapMargin) particle.y = -wrapMargin;
-      }
-
       const now = performance.now();
       this.ripples = this.ripples.filter((ripple) => now - ripple.startedAt < 1000);
 
-      if (now >= this.nextShootingAt) {
-        this.spawnShootingStar(now);
+      if (this.environment === "flow") {
+        this.updateFlow(dt);
+      } else {
+        for (const particle of this.particles) {
+          particle.vx += (particle.baseVx - particle.vx) * 0.02;
+          particle.vy += (particle.baseVy - particle.vy) * 0.02;
+
+          const px = (this.pointer.x - 0.5) * particle.depth * parallaxStrength;
+          const py = (this.pointer.y - 0.5) * particle.depth * parallaxStrength;
+
+          particle.x += (particle.vx + px) * dt * 60 * speedFactor;
+          particle.y += (particle.vy + py) * dt * 60 * speedFactor;
+
+          if (particle.x < -wrapMargin) particle.x = this.width + wrapMargin;
+          if (particle.x > this.width + wrapMargin) particle.x = -wrapMargin;
+          if (particle.y < -wrapMargin) particle.y = this.height + wrapMargin;
+          if (particle.y > this.height + wrapMargin) particle.y = -wrapMargin;
+        }
+
+        if (now >= this.nextShootingAt) {
+          this.spawnShootingStar(now);
+        }
+
+        const shootingScale = this.starSpeed * (this.reducedMotion ? 0.7 : 1.15);
+        this.shootingStars = this.shootingStars.filter((star) => {
+          star.life += dt;
+          star.x += star.vx * dt * shootingScale;
+          star.y += star.vy * dt * shootingScale;
+
+          const alive = star.life < star.ttl;
+          const onCanvas = star.x < this.width + 180 && star.y < this.height + 180;
+          return alive && onCanvas;
+        });
       }
-
-      const shootingScale = this.starSpeed * (this.reducedMotion ? 0.7 : 1.15);
-      this.shootingStars = this.shootingStars.filter((star) => {
-        star.life += dt;
-        star.x += star.vx * dt * shootingScale;
-        star.y += star.vy * dt * shootingScale;
-
-        const alive = star.life < star.ttl;
-        const onCanvas = star.x < this.width + 180 && star.y < this.height + 180;
-        return alive && onCanvas;
-      });
     }
 
     render() {
@@ -729,9 +966,15 @@
       this.ctx.fillStyle = palette.background;
       this.ctx.fillRect(0, 0, this.width, this.height);
 
-      this.drawNebula();
-      this.drawParticles();
-      this.drawShootingStars();
+      if (this.environment === "flow") {
+        this.drawFlowBackground();
+        this.drawFlowStreamlines();
+      } else {
+        this.drawNebula();
+        this.drawParticles();
+        this.drawShootingStars();
+      }
+
       this.drawRipples();
     }
 
@@ -765,6 +1008,235 @@
 
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      }
+
+      this.ctx.restore();
+    }
+
+    updateFlow(dt) {
+      const baseSpeed = this.getFlowBaseSpeed();
+      const body = this.getFlowBodyShape();
+      const influenceMetric = 2.55;
+      const swayStrength = this.reducedMotion ? 0.004 : 0.008 + this.intensity * 0.008;
+      const verticalDamping = this.reducedMotion ? 0.93 : 0.968;
+      const laneCohesion = this.reducedMotion ? 0.0015 : 0.0032;
+      const maxTrailLength = this.reducedMotion ? 16 : 30;
+
+      for (const flowParticle of this.flowParticles) {
+        if (!Number.isFinite(flowParticle.baseY)) {
+          flowParticle.baseY = flowParticle.y;
+        }
+        if (!Number.isFinite(flowParticle.speedBias)) {
+          flowParticle.speedBias = 1;
+          flowParticle.x = Math.random() * (this.width + 180);
+        }
+
+        const localBaseSpeed = baseSpeed * flowParticle.speedBias;
+
+        flowParticle.vx += (-localBaseSpeed - flowParticle.vx) * 0.055;
+        flowParticle.vy *= verticalDamping;
+        flowParticle.vy += Math.sin(this.time * 1.6 + flowParticle.seed + flowParticle.x * 0.006) * swayStrength;
+        flowParticle.vy += (flowParticle.baseY - flowParticle.y) * laneCohesion;
+
+        const metric = this.getFlowBodyMetric(flowParticle.x, flowParticle.y, body);
+        const radial = Math.sqrt(metric);
+
+        if (radial < influenceMetric) {
+          const normal = this.getFlowBodyNormal(flowParticle.x, flowParticle.y, body);
+          const falloff = 1 - radial / influenceMetric;
+          const sideSign = flowParticle.y >= body.cy ? 1 : -1;
+          const surfaceBand = Math.abs(radial - 1);
+          const surfaceAttach = clamp(1 - surfaceBand / 0.65, 0, 1);
+
+          let tx = -normal.y;
+          let ty = normal.x;
+          if (ty * sideSign < 0) {
+            tx = -tx;
+            ty = -ty;
+          }
+
+          flowParticle.vx += normal.x * falloff * localBaseSpeed * 0.16;
+          flowParticle.vy += normal.y * falloff * localBaseSpeed * 0.22;
+          flowParticle.vx += tx * falloff * localBaseSpeed * 0.42;
+          flowParticle.vy += ty * falloff * localBaseSpeed * 1.22;
+
+          const desiredSlipSpeed = localBaseSpeed * (1.02 + surfaceAttach * 0.45);
+          const desiredVx = tx * desiredSlipSpeed;
+          const desiredVy = ty * desiredSlipSpeed;
+          const slipBlend = 0.08 + surfaceAttach * 0.22;
+          flowParticle.vx = lerp(flowParticle.vx, desiredVx, slipBlend);
+          flowParticle.vy = lerp(flowParticle.vy, desiredVy, slipBlend);
+        }
+
+        if (metric < 1.03) {
+          const normal = this.getFlowBodyNormal(flowParticle.x, flowParticle.y, body);
+          const penetration = 1.03 - Math.sqrt(Math.max(metric, 0.0001));
+
+          flowParticle.x += normal.x * penetration * body.halfChord * 0.24;
+          flowParticle.y += normal.y * penetration * body.halfThickness * 0.62;
+
+          const sideSign = flowParticle.y >= body.cy ? 1 : -1;
+          let tx = -normal.y;
+          let ty = normal.x;
+          if (ty * sideSign < 0) {
+            tx = -tx;
+            ty = -ty;
+          }
+
+          const tangentNorm = Math.hypot(tx, ty) || 1;
+          tx /= tangentNorm;
+          ty /= tangentNorm;
+
+          const tangentSpeed = Math.max(localBaseSpeed * 0.92, Math.hypot(flowParticle.vx, flowParticle.vy));
+          flowParticle.vx = lerp(flowParticle.vx, tx * tangentSpeed, 0.5);
+          flowParticle.vy = lerp(flowParticle.vy, ty * tangentSpeed, 0.62);
+        }
+
+        const maxVy = localBaseSpeed * 1.45;
+        flowParticle.vy = clamp(flowParticle.vy, -maxVy, maxVy);
+
+        flowParticle.x += flowParticle.vx * dt * 60;
+        flowParticle.y += flowParticle.vy * dt * 60;
+
+        const rawSpeedNorm = clamp(
+          Math.hypot(flowParticle.vx, flowParticle.vy) / Math.max(0.001, localBaseSpeed * 1.3),
+          0,
+          1
+        );
+        const speedNorm = clamp(Math.pow(rawSpeedNorm, 0.85), 0, 1);
+        flowParticle.trail.push({ x: flowParticle.x, y: flowParticle.y, speedNorm });
+
+        if (flowParticle.trail.length > maxTrailLength) {
+          flowParticle.trail.shift();
+        }
+
+        const outOfBounds = flowParticle.x < 0;
+
+        if (outOfBounds) {
+          this.recycleFlowParticle(flowParticle);
+        }
+      }
+    }
+
+    drawFlowBackground() {
+      const flowPalette = this.profile.palette.flowBackground;
+      const gradient = this.ctx.createLinearGradient(this.width, 0, 0, this.height);
+      gradient.addColorStop(0, flowPalette.start);
+      gradient.addColorStop(1, flowPalette.end);
+      this.ctx.fillStyle = gradient;
+      this.ctx.fillRect(0, 0, this.width, this.height);
+
+      const body = this.getFlowBodyShape();
+      const hazeRadius = body.chord * 2.8;
+      const haze = this.ctx.createRadialGradient(body.cx, body.cy, 0, body.cx, body.cy, hazeRadius);
+      haze.addColorStop(0, flowPalette.haze);
+      haze.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+      this.ctx.fillStyle = haze;
+      this.ctx.fillRect(body.cx - hazeRadius, body.cy - hazeRadius, hazeRadius * 2, hazeRadius * 2);
+    }
+
+    drawFlowBoundary() {
+      const body = this.getFlowBodyShape();
+      const flowPalette = this.profile.palette.flowBackground;
+
+      this.ctx.save();
+      this.ctx.globalCompositeOperation = "screen";
+
+      const glowRadius = body.chord * 0.95;
+      const glow = this.ctx.createRadialGradient(body.cx, body.cy, body.halfThickness * 0.28, body.cx, body.cy, glowRadius);
+      glow.addColorStop(0, "rgba(218, 229, 246, 0.16)");
+      glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+      this.ctx.fillStyle = glow;
+      this.ctx.fillRect(body.cx - glowRadius, body.cy - glowRadius, glowRadius * 2, glowRadius * 2);
+
+      this.drawFlowBodyPath(body);
+      this.ctx.fillStyle = "rgba(194, 210, 239, 0.11)";
+      this.ctx.fill();
+
+      this.ctx.strokeStyle = flowPalette.obstacle;
+      this.ctx.lineWidth = 1.1;
+      this.ctx.setLineDash([6, 7]);
+      this.drawFlowBodyPath(body);
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
+
+    flowColorFromSpeed(speedNorm, alpha) {
+      let stops;
+
+      if (this.mode === "focus") {
+        // Focus modunda cizgiler magenta tabanli.
+        stops = [
+          { t: 0, rgb: [246, 126, 238] },
+          { t: 0.5, rgb: [226, 108, 231] },
+          { t: 1, rgb: [206, 92, 224] }
+        ];
+      } else if (this.mode === "night") {
+        // Night modunda cizgiler kirmizi tabanli.
+        stops = [
+          { t: 0, rgb: [246, 124, 124] },
+          { t: 0.5, rgb: [236, 102, 102] },
+          { t: 1, rgb: [220, 84, 84] }
+        ];
+      } else {
+        stops = [
+          { t: 0, rgb: [239, 142, 149] }, // kirmizi
+          { t: 0.2, rgb: [245, 184, 128] }, // turuncu
+          { t: 0.4, rgb: [244, 229, 151] }, // sari
+          { t: 0.6, rgb: [166, 227, 185] }, // yesil
+          { t: 0.8, rgb: [145, 188, 240] }, // mavi
+          { t: 1, rgb: [194, 156, 236] } // mor
+        ];
+      }
+
+      let left = stops[0];
+      let right = stops[stops.length - 1];
+      for (let index = 1; index < stops.length; index += 1) {
+        if (speedNorm <= stops[index].t) {
+          left = stops[index - 1];
+          right = stops[index];
+          break;
+        }
+      }
+
+      const segment = Math.max(0.0001, right.t - left.t);
+      const localT = clamp((speedNorm - left.t) / segment, 0, 1);
+      const r = Math.round(lerp(left.rgb[0], right.rgb[0], localT));
+      const g = Math.round(lerp(left.rgb[1], right.rgb[1], localT));
+      const b = Math.round(lerp(left.rgb[2], right.rgb[2], localT));
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    drawFlowStreamlines() {
+      if (!this.flowParticles.length) {
+        return;
+      }
+
+      const alphaScale = this.reducedMotion ? 0.7 : 1;
+
+      this.ctx.save();
+      this.ctx.globalCompositeOperation = "lighter";
+
+      for (const flowParticle of this.flowParticles) {
+        if (flowParticle.trail.length < 2) {
+          continue;
+        }
+
+        for (let index = 1; index < flowParticle.trail.length; index += 1) {
+          const prev = flowParticle.trail[index - 1];
+          const curr = flowParticle.trail[index];
+          const t = index / (flowParticle.trail.length - 1);
+          const speedNorm = clamp((prev.speedNorm + curr.speedNorm) * 0.5, 0, 1);
+          const alpha = (0.08 + t * 0.44) * alphaScale;
+
+          this.ctx.strokeStyle = this.flowColorFromSpeed(speedNorm, alpha);
+          this.ctx.lineWidth = 0.5 + t * 1.7;
+          this.ctx.beginPath();
+          this.ctx.moveTo(prev.x, prev.y);
+          this.ctx.lineTo(curr.x, curr.y);
+          this.ctx.stroke();
+        }
       }
 
       this.ctx.restore();
@@ -855,8 +1327,10 @@
       this.audio = audio;
 
       this.elements = {
+        intensityLabelText: document.getElementById("intensity-label-text"),
         intensityInput: document.getElementById("intensity"),
         intensityValue: document.getElementById("intensity-value"),
+        starSpeedLabelText: document.getElementById("star-speed-label-text"),
         starSpeedInput: document.getElementById("star-speed"),
         starSpeedValue: document.getElementById("star-speed-value"),
         soundToggle: document.getElementById("sound-toggle"),
@@ -877,9 +1351,13 @@
         timerReset: document.getElementById("timer-reset")
       };
 
-      this.modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
+      this.environmentButtons = Array.from(document.querySelectorAll(".environment-btn"));
+      this.modeButtons = Array.from(document.querySelectorAll(".mode-btn[data-mode]"));
       this.groupToggles = Array.from(document.querySelectorAll(".group-toggle"));
-      this.resizeHandler = debounce(() => this.engine.resize(), 180);
+      this.resizeHandler = debounce(() => {
+        this.engine.resize();
+        this.syncFlowBodyAnchor();
+      }, 180);
       this.goals = [];
       this.pointerHoldInterval = 0;
       this.pointerHoldPosition = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5 };
@@ -913,6 +1391,7 @@
 
     init() {
       const savedMode = Storage.get(STORAGE_KEYS.mode, "ambient");
+      const savedEnvironment = Storage.get(STORAGE_KEYS.environment, "space");
       const savedIntensity = Storage.get(STORAGE_KEYS.intensity, 0.65);
       const savedStarSpeed = Storage.get(STORAGE_KEYS.starSpeed, 1);
       const savedGoals = Storage.get(STORAGE_KEYS.goals, []);
@@ -928,6 +1407,7 @@
         : [];
 
       this.setMode(savedMode, false);
+      this.setEnvironment(savedEnvironment, false);
       this.setIntensity(savedIntensity, false);
       this.setStarSpeed(savedStarSpeed, false);
       this.applyTimerDurations(savedTimerWork, savedTimerBreak, false);
@@ -952,6 +1432,12 @@
     bindEvents() {
       for (const toggleButton of this.groupToggles) {
         toggleButton.addEventListener("click", () => this.toggleGroup(toggleButton));
+      }
+
+      for (const button of this.environmentButtons) {
+        button.addEventListener("click", () => {
+          this.setEnvironment(button.dataset.environment, true);
+        });
       }
 
       for (const button of this.modeButtons) {
@@ -1172,6 +1658,45 @@
       }
     }
 
+    setEnvironment(environment, persist) {
+      const nextEnvironment = environment === "flow" ? "flow" : "space";
+
+      this.engine.setEnvironment(nextEnvironment);
+      document.body.dataset.environment = nextEnvironment;
+
+      for (const button of this.environmentButtons) {
+        const isActive = button.dataset.environment === nextEnvironment;
+        button.classList.toggle("is-active", isActive);
+      }
+
+      this.updateControlLabels(nextEnvironment);
+      this.syncFlowBodyAnchor();
+
+      if (persist) {
+        Storage.set(STORAGE_KEYS.environment, nextEnvironment);
+      }
+    }
+
+    updateControlLabels(environment) {
+      const isFlow = environment === "flow";
+      this.elements.intensityLabelText.textContent = isFlow ? "Akış Yoğunluğu" : "Yoğunluk";
+      this.elements.starSpeedLabelText.textContent = isFlow ? "Akış Hızı" : "Yıldız Hızı";
+    }
+
+    syncFlowBodyAnchor() {
+      const target = this.elements.centerTimerDisplay;
+      if (!target) {
+        return;
+      }
+
+      const rect = target.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        return;
+      }
+
+      this.engine.setFlowBodyAnchor(rect.right, rect.top + rect.height * 0.5);
+    }
+
     setIntensity(value, persist) {
       const normalized = clamp(Number(value) || 0.65, 0.2, 1);
       this.elements.intensityInput.value = normalized.toFixed(2);
@@ -1185,7 +1710,7 @@
     }
 
     setStarSpeed(value, persist) {
-      const normalized = clamp(Number(value) || 1, 0.4, 5);
+      const normalized = clamp(Number(value) || 1, 0.4, 20);
       this.elements.starSpeedInput.value = normalized.toFixed(1);
       this.elements.starSpeedValue.textContent = `${normalized.toFixed(1)}x`;
 
@@ -1356,6 +1881,7 @@
       this.elements.timerPhase.classList.toggle("is-break", isBreak);
       this.elements.centerTimerPhase.classList.toggle("is-break", isBreak);
       this.elements.centerTimerDisplay.classList.toggle("is-break", isBreak);
+      this.syncFlowBodyAnchor();
 
       this.elements.timerStart.disabled = running;
       this.elements.timerStop.disabled = !running;

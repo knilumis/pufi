@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
-    <title>Çalışma Alanı</title>
+    <title>Pufi Çalışma Alanı</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body data-mode="ambient">
@@ -52,6 +52,14 @@
           </button>
           <div id="mod-menu-content" class="group-content">
             <section class="panel-section">
+              <label class="section-title" for="environment-space">Ortam</label>
+              <div class="environment-switch" role="group" aria-label="Ortam seçimi">
+                <button id="environment-space" type="button" class="mode-btn environment-btn" data-environment="space" aria-label="Uzay ortamı">Uzay</button>
+                <button type="button" class="mode-btn environment-btn" data-environment="flow" aria-label="Akış ortamı">Akış</button>
+              </div>
+            </section>
+
+            <section class="panel-section">
               <label class="section-title" for="mode-ambient">Mod</label>
               <div class="mode-switch" role="group" aria-label="Mod seçimi">
                 <button id="mode-ambient" type="button" class="mode-btn" data-mode="ambient" aria-label="Ambient modu">Ambient</button>
@@ -61,13 +69,13 @@
             </section>
 
             <section class="panel-section">
-              <label class="section-title" for="intensity">Yoğunluk <span id="intensity-value">65%</span></label>
+              <label class="section-title" for="intensity"><span id="intensity-label-text">Yoğunluk</span> <span id="intensity-value">65%</span></label>
               <input id="intensity" type="range" min="0.2" max="1" step="0.05" value="0.65" aria-label="Animasyon yoğunluğu" />
             </section>
 
             <section class="panel-section">
-              <label class="section-title" for="star-speed">Yıldız Hızı <span id="star-speed-value">1.0x</span></label>
-              <input id="star-speed" type="range" min="0.4" max="5" step="0.1" value="1" aria-label="Yıldız hareket hızı" />
+              <label class="section-title" for="star-speed"><span id="star-speed-label-text">Yıldız Hızı</span> <span id="star-speed-value">1.0x</span></label>
+              <input id="star-speed" type="range" min="0.4" max="20" step="0.1" value="1" aria-label="Yıldız hareket hızı" />
             </section>
           </div>
         </section>
